@@ -60,18 +60,19 @@ if rails_2_4_or_newer && arel_older_than_7_1
   end
 end
 
-begin
-  TestCaseClass = MiniTest::Test
-rescue NameError
-  TestCaseClass = MiniTest::Unit::TestCase
-end
-
 require 'default_value_for'
 
+puts "\nTesting with ruby version #{RUBY_VERSION}"
 puts "\nTesting with Active Record version #{ActiveRecord::VERSION::STRING}"
 puts "\nTesting with Action Pack version #{ActionPack::VERSION::STRING}\n\n"
 
-ActiveRecord::Base.default_timezone = :local
+if ActiveRecord.respond_to?(:default_timezone)
+  ActiveRecord.default_timezone = :local
+else
+  # Deprecated in rails 7.0, removed in 7.1
+  ActiveRecord::Base.default_timezone = :local
+end
+
 ActiveRecord::Base.logger           = Logger.new(STDERR)
 ActiveRecord::Base.logger.level     = Logger::WARN
 
@@ -101,7 +102,7 @@ if defined?(Rails::Railtie)
   DefaultValueFor.initialize_active_record_extensions
 end
 
-class DefaultValuePluginTest < TestCaseClass
+class DefaultValuePluginTest < Minitest::Test
   def around
     Object.const_set(:User, Class.new(ActiveRecord::Base))
     Object.const_set(:Book, Class.new(ActiveRecord::Base))
@@ -285,6 +286,25 @@ class DefaultValuePluginTest < TestCaseClass
 
       default_value_for :number, 1234
     end
+    object = Book.new
+    assert_equal 1234, object.number
+    assert_equal 5678, object.count
+    assert object.instance_variable_get('@initialized')
+  end
+
+  def test_doesnt_conflict_with_prependeed_initialize_method_in_model_class
+    m = Object.const_set("BookOverride", Module.new)
+    m.define_method(:initialize) do |*args|
+      @initialized = true
+      super(:count => 5678)
+    end
+
+    Book.class_eval do
+      prepend BookOverride
+
+      default_value_for :number, 1234
+    end
+
     object = Book.new
     assert_equal 1234, object.number
     assert_equal 5678, object.count

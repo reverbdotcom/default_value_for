@@ -20,9 +20,27 @@ u.last_seen  # => Mon Sep 22 17:28:38 +0200 2008
 
 ## Installation
 
-### Rails 3.2 - 4.2 / Ruby 1.9.3 and higher
+### On Rails 6.1+ / Ruby 3.0+
 
-The current version of default_value_for (3.x+) is compatible with Rails 3.2 or higher, and Ruby 1.9.3 and higher.
+The objective is to support all supported rubies and rails versions.  If you need to support end of life versions, please see the sections below and use a prior release.
+
+Add it to your Gemfile:
+
+```ruby
+gem "default_value_for", "~> 4.0"
+```
+
+Version 4.0.0 supports rails 6.1+ and ruby 3.0+. It adds support for rails 7.2. It drops support for rubies less than 3.0 and rails less than 6.1.  This is the reason for the major version bump as it drops support for many combinations of older ruby and rails versions.
+
+### On Rails 3.2 - 6.0 / Ruby 1.9.3 - 2.7
+
+To use default_value_for with older versions of Ruby and Rails, you must use the previous stable release, 3.6.0 or others in the 3.x.y release. This version works with Rails 3.0, 3.1, and 3.2; and Ruby 1.8.7 and higher. It **does not** work with Rails 4.
+
+default_value_for (3.x+) is compatible with Rails 3.2-6.1, and Ruby 1.9.3 and higher.
+
+Note:
+* Version 3.5.0: Added basic rails 7.0 support
+* Version 3.6.0: Added basic rails 7.1 support
 
 Add it to your Gemfile:
 
@@ -30,11 +48,7 @@ Add it to your Gemfile:
 gem "default_value_for", "~> 3.0"
 ```
 
-This gem is signed using PGP with the Phusion Software Signing key: http://www.phusion.nl/about/gpg. That key in turn is signed by the rubygems-openpgp Certificate Authority: http://www.rubygems-openpgp-ca.org/.
-
-You can verify the authenticity of the gem by following The Complete Guide to Verifying Gems with rubygems-openpgp: http://www.rubygems-openpgp-ca.org/blog/the-complete-guide-to-verifying-gems-with-rubygems-openpgp.html
-
-## Rails 3.0 - 3.1 / Ruby 1.9.3 and lower
+## On Rails 3.0 - 3.1 / Ruby 1.9.3 and lower
 
 To use default_value_for with older versions of Ruby and Rails, you must use the previous stable release, 2.0.3. This version works with Rails 3.0, 3.1, and 3.2; and Ruby 1.8.7 and higher. It **does not** work with Rails 4.
 
@@ -42,7 +56,7 @@ To use default_value_for with older versions of Ruby and Rails, you must use the
 gem "default_value_for", "~> 2.0.3"
 ```
 
-### Rails 2
+### On Rails 2
 
 To use default_value_for with Rails 2.x you must use an older version:
 
@@ -346,25 +360,30 @@ class User < ActiveRecord::Base
 end
 ```
 
-We recommend you to alias chain your initialize method in models where you use `default_value_for`:
+We recommend you to use Module#prepend in models where you use `default_value_for`:
+
+```ruby
+module UserCustomInitialize
+  def initialize
+    # Do your pre-initialize work
+    super
+    # Do any post-initialize work
+  end
+end
+```
 
 ```ruby
 class User < ActiveRecord::Base
   default_value_for :age, 20
-
-  def initialize_with_my_app
-    initialize_without_my_app(:name => 'Name cannot be changed in constructor')
-  end
-
-  alias_method_chain :initialize, :my_app
+  prepend UserCustomInitialize
 end
 ```
 
-Also, stick with the following rules:
+Also, take the following precautions:
 
-* There is no need to +alias_method_chain+ your initialize method in models that don't use `default_value_for`.
+* Make sure you always call super in your prepended method.
 
-* Make sure that +alias_method_chain+ is called *after* the last `default_value_for` occurrence.
+* It's generally safer to call super first and do your customizations afterwards to ensure everything is setup first.
 
 If your default value is accidentally similar to default_value_for's options hash wrap your default value like this:
 
@@ -537,13 +556,21 @@ That's an awful lot of code. Using `default_value_for` is easier, don't you thin
 
 ### What about other plugins?
 
-I've only been able to find 2 similar plugins:
+There are other ways to accomplish similar results as `default_value_for`.
 
-* Default Value: http://agilewebdevelopment.com/plugins/default_value
+From Rails:
+* [attribute default](https://api.rubyonrails.org/classes/ActiveRecord/Attributes/ClassMethods.html#method-i-attribute)
+* [schema migration column defaults](https://edgeguides.rubyonrails.org/active_record_migrations.html)
 
-* ActiveRecord Defaults: http://agilewebdevelopment.com/plugins/activerecord_defaults
+Other plugins:
+* [Defaults](https://github.com/fnando/defaults)
+* [attribute-defaults](https://github.com/bsm/attribute-defaults)
+* [has_defaults](https://github.com/makandra/has_defaults)
 
-'Default Value' appears to be unmaintained; its SVN link is broken. This leaves only 'ActiveRecord Defaults'. However, it is semantically dubious, which leaves it wide open for corner cases. For example, it is not clearly specified what ActiveRecord Defaults will do when attributes are protected by +attr_protected+ or +attr_accessible+. It is also not clearly specified what one is supposed to do if one needs a custom +initialize+ method in the model.
+Each of these has limitations and should be evaluated based on your use cases.  Two areas where `default_value_for` excels is deriving
+defaults based on the current object or determining the behavior for `nil` values.
+
+If there are other options or uses cases where you've found this gem or another one is useful, please open a pull request to update this page.
 
 I've taken my time to thoroughly document default_value_for's behavior.
 
